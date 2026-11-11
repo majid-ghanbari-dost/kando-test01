@@ -36,11 +36,11 @@ def main():
      if not isinstance(x,dict):raise ValueError("record is not object")
      records.append(x)
     except Exception as e:bad.append({"line":n,"error":str(e)})
-  r["metrics"].update({"dataset_path":str(dataset.relative_to(root)),"dataset_nonempty_lines":sum(bool(x.strip()) for x in raw),"record_count":len(records),"jsonl_parse_errors":len(bad)})
+  r["metrics"].update({"dataset_path":str(dataset.relative_to(root)),"dataset_nonempty_lines":sum(bool(x.strip()) for x in raw),"record_count":len(records),"jsonl_parse_errors":len(bad),"sample_record_keys":sorted(records[0].keys()) if records else []})
   r["checks"]["jsonl_parse"]="PASS" if not bad else "FAIL"
   if bad:r["errors"].append("JSONL parse errors: "+json.dumps(bad[:10],ensure_ascii=False))
- schemas=[p for p in files if p.name.endswith(".schema.json") or ("schema" in p.parts and p.suffix==".json")]
- if records and schemas:
+ schemas=[p for p in files if p.name.endswith(".schema.json") or (any(part.lower().startswith("schema") for part in p.parts) and p.suffix==".json") or "schema" in p.name.lower()]
+ r["metrics"]["schema_candidates"]=[str(p.relative_to(root)) for p in schemas]\n if records and schemas:
   try:
    import jsonschema
    s=json.loads(schemas[0].read_text(encoding="utf-8"));cls=jsonschema.validators.validator_for(s);cls.check_schema(s);v=cls(s);fail=[]
@@ -95,9 +95,9 @@ def main():
   r["metrics"]["manifest"]={"checked":checked,"missing":missing,"mismatched":mismatch,"malformed":malformed};r["checks"]["sha256_manifest"]="PASS" if checked and not missing and not mismatch and not malformed else "FAIL"
   if missing or mismatch or malformed:r["errors"].append("SHA-256 manifest verification failed.")
  else:r["checks"]["sha256_manifest"]="NOT_FOUND";r["warnings"].append("SHA-256 manifest not found.")
- batches=sorted(p for p in files if any(part.lower().startswith("batch") for part in p.parts) and p.suffix==".jsonl")
+ batches=sorted(p for p in files if re.fullmatch(r"batch_\\d+\\.jsonl",p.name,re.I))
  if dataset and batches:
-  exact=b"".join(p.read_bytes() for p in batches)==dataset.read_bytes();r["metrics"]["batch_file_count"]=len(batches);r["checks"]["batch_reconstruction_byte_exact"]="PASS" if exact else "FAIL"
+  exact=b"".join(p.read_bytes() for p in batches)==dataset.read_bytes();r["metrics"]["batch_file_count"]=len(batches);r["metrics"]["batch_paths"]=[str(p.relative_to(root)) for p in batches];r["checks"]["batch_reconstruction_byte_exact"]="PASS" if exact else "FAIL"
   if not exact:
    try:
     br=[]
