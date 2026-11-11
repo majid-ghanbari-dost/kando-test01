@@ -35,6 +35,9 @@ jobs:
             --archive kandoo-intent-dataset_v0.2.zip \
             --out audit-output
 
+      - name: Re-run delivered QC toolchain independently
+        run: python audit-output/extracted/v0.2/scripts/delivery_audit.py
+
       - name: Upload independent audit report
         if: always()
         uses: actions/upload-artifact@v4
@@ -43,4 +46,5 @@ jobs:
           path: |
             audit-output/audit-report.md
             audit-output/audit-report.json
+            audit-output/extracted/v0.2/reports/*.json
           if-no-files-found: warn
