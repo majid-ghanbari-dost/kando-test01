@@ -67,6 +67,7 @@ def main():
   if p.name=="_progress.json":
    content=p.read_text(encoding="utf-8-sig",errors="replace").splitlines()
    r["metrics"]["progress_gap_context"]=[{"line":i+1,"text":line[:500]} for i,line in enumerate(content) if "A-0008" in line or "split" in line.lower() or "train" in line.lower() or "validation" in line.lower()]
+ r["metrics"]["documentation_split_mentions"]=[]
  for p in docs:
   for line_no,line in enumerate(p.read_text(encoding="utf-8-sig",errors="replace").splitlines(),1):
    if re.search(r"split|train|validation|test|تقسیم|آموزش",line,re.I):
