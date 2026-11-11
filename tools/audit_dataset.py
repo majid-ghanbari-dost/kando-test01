@@ -44,6 +44,14 @@ def main():
  r["metrics"]["archive_file_inventory"]=r["files"]
  docs=[p for p in files if p.name.lower() in {"readme.md","dataset_documentation.md","data_documentation.md"}]
  r["metrics"]["documentation_excerpts"]=[{"path":str(p.relative_to(root)),"excerpt":p.read_text(encoding="utf-8-sig",errors="replace")[:3500]} for p in docs]
+ r["metrics"]["qc_report_excerpts"]=[]
+ for p in files:
+  if p.parent.name=="reports" and p.name in {"qc_stage_a_report.json","qc_stage_b_report.json","qc_stage_c_report.json","qc_stage_d_report.json","delivery_audit.json","human_review_priority.json","dataset_statistics.json"}:
+   try:
+    obj=json.loads(p.read_text(encoding="utf-8-sig"))
+    r["metrics"]["qc_report_excerpts"].append({"path":str(p.relative_to(root)),"json":json.dumps(obj,ensure_ascii=False)[:4500]})
+   except Exception as e:r["metrics"]["qc_report_excerpts"].append({"path":str(p.relative_to(root)),"error":repr(e)})
+
  r["metrics"]["sample_records_by_task_type"]={}
  for rec in records:
   typ=str(rec.get("task_type","UNSPECIFIED"))
