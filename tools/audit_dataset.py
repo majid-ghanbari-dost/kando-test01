@@ -54,6 +54,18 @@ def main():
 
  progress=[p for p in files if p.name=="_progress.json"]
  r["metrics"]["progress_excerpt"]=[p.read_text(encoding="utf-8-sig",errors="replace")[:9000] for p in progress]
+ r["metrics"]["documentation_split_mentions"]=[]
+ for p in docs:
+  for line_no,line in enumerate(p.read_text(encoding="utf-8-sig",errors="replace").splitlines(),1):
+   if re.search(r"split|train|validation|test|تقسیم|آموزش",line,re.I):
+    r["metrics"]["documentation_split_mentions"].append({"path":str(p.relative_to(root)),"line":line_no,"text":line[:500]})
+ for p in progress:
+  try:
+   pobj=json.loads(p.read_text(encoding="utf-8-sig"))
+   r["metrics"]["progress_top_level_keys"]=sorted(pobj.keys())
+   for key in ("qc_incidents","conventions","deliverables","targets","closed_intents"):
+    if key in pobj:r["metrics"]["progress_"+key]=pobj[key]
+  except Exception as e:r["metrics"]["progress_parse_error"]=repr(e)
  selected_ids={"KND-S-0249","KND-M-0034","KND-S-0076","KND-S-0092","KND-S-0030","KND-S-0031","KND-S-0219"}
  r["metrics"]["flagged_record_samples"]=[{"id":rec.get("id"),"text":rec.get("text"),"intents":rec.get("intents"),"needs_clarification":rec.get("needs_clarification")} for rec in records if rec.get("id") in selected_ids]
  r["metrics"]["sample_records_by_task_type"]={}
