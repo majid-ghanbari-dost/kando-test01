@@ -1,5 +1,5 @@
 name: Independent Dataset v0.2 Audit
-# Re-runs after every audit-tool change; report is uploaded as a workflow artifact.
+# Independent audit: ZIP, JSONL, schema, batch lineage, split readiness, and QC evidence.
 
 on:
   push:
