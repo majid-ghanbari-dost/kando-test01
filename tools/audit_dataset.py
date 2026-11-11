@@ -54,7 +54,19 @@ def main():
 
  progress=[p for p in files if p.name=="_progress.json"]
  r["metrics"]["progress_excerpt"]=[p.read_text(encoding="utf-8-sig",errors="replace")[:9000] for p in progress]
- r["metrics"]["documentation_split_mentions"]=[]
+ r["metrics"]["documentation_context_windows"]=[]
+ for p in docs:
+  content=p.read_text(encoding="utf-8-sig",errors="replace").splitlines()
+  targets=[i for i,line in enumerate(content) if re.search(r"split|train|validation|test|تقسیم",line,re.I)]
+  for i in targets:
+   lo=max(0,i-4);hi=min(len(content),i+6)
+   r["metrics"]["documentation_context_windows"].append({"path":str(p.relative_to(root)),"start_line":lo+1,"lines":content[lo:hi]})
+ script_audit=[p for p in files if p.name=="delivery_audit.py"]
+ r["metrics"]["delivery_audit_script_excerpt"]=[p.read_text(encoding="utf-8-sig",errors="replace")[:7000] for p in script_audit]
+ for p in files:
+  if p.name=="_progress.json":
+   content=p.read_text(encoding="utf-8-sig",errors="replace").splitlines()
+   r["metrics"]["progress_gap_context"]=[{"line":i+1,"text":line[:500]} for i,line in enumerate(content) if "A-0008" in line or "split" in line.lower() or "train" in line.lower() or "validation" in line.lower()]
  for p in docs:
   for line_no,line in enumerate(p.read_text(encoding="utf-8-sig",errors="replace").splitlines(),1):
    if re.search(r"split|train|validation|test|تقسیم|آموزش",line,re.I):
