@@ -41,6 +41,14 @@ def main():
   if bad:r["errors"].append("JSONL parse errors: "+json.dumps(bad[:10],ensure_ascii=False))
  schemas=[p for p in files if p.name.endswith(".schema.json") or (any(part.lower().startswith("schema") for part in p.parts) and p.suffix==".json") or "schema" in p.name.lower()]
  r["metrics"]["schema_candidates"]=[str(p.relative_to(root)) for p in schemas]
+ r["metrics"]["archive_file_inventory"]=r["files"]
+ docs=[p for p in files if p.name.lower() in {"readme.md","dataset_documentation.md","data_documentation.md"}]
+ r["metrics"]["documentation_excerpts"]=[{"path":str(p.relative_to(root)),"excerpt":p.read_text(encoding="utf-8-sig",errors="replace")[:3500]} for p in docs]
+ r["metrics"]["sample_records_by_task_type"]={}
+ for rec in records:
+  typ=str(rec.get("task_type","UNSPECIFIED"))
+  bucket=r["metrics"]["sample_records_by_task_type"].setdefault(typ,[])
+  if len(bucket)<3:bucket.append({"id":rec.get("id"),"text":rec.get("text"),"intents":rec.get("intents"),"candidate_intents":rec.get("candidate_intents"),"needs_clarification":rec.get("needs_clarification"),"clarification_reason":rec.get("clarification_reason"),"clarification_question":rec.get("clarification_question")})
  if records and schemas:
   try:
    import jsonschema
