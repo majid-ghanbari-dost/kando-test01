@@ -95,7 +95,7 @@ def main():
   r["metrics"]["manifest"]={"checked":checked,"missing":missing,"mismatched":mismatch,"malformed":malformed};r["checks"]["sha256_manifest"]="PASS" if checked and not missing and not mismatch and not malformed else "FAIL"
   if missing or mismatch or malformed:r["errors"].append("SHA-256 manifest verification failed.")
  else:r["checks"]["sha256_manifest"]="NOT_FOUND";r["warnings"].append("SHA-256 manifest not found.")
- batches=sorted(p for p in files if "batch" in p.parts and p.suffix==".jsonl")
+ batches=sorted(p for p in files if any(part.lower().startswith("batch") for part in p.parts) and p.suffix==".jsonl")
  if dataset and batches:
   exact=b"".join(p.read_bytes() for p in batches)==dataset.read_bytes();r["metrics"]["batch_file_count"]=len(batches);r["checks"]["batch_reconstruction_byte_exact"]="PASS" if exact else "FAIL"
   if not exact:
