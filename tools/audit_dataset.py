@@ -52,6 +52,10 @@ def main():
     r["metrics"]["qc_report_excerpts"].append({"path":str(p.relative_to(root)),"json":json.dumps(obj,ensure_ascii=False)[:4500]})
    except Exception as e:r["metrics"]["qc_report_excerpts"].append({"path":str(p.relative_to(root)),"error":repr(e)})
 
+ progress=[p for p in files if p.name=="_progress.json"]
+ r["metrics"]["progress_excerpt"]=[p.read_text(encoding="utf-8-sig",errors="replace")[:9000] for p in progress]
+ selected_ids={"KND-S-0249","KND-M-0034","KND-S-0076","KND-S-0092","KND-S-0030","KND-S-0031","KND-S-0219"}
+ r["metrics"]["flagged_record_samples"]=[{"id":rec.get("id"),"text":rec.get("text"),"intents":rec.get("intents"),"needs_clarification":rec.get("needs_clarification")} for rec in records if rec.get("id") in selected_ids]
  r["metrics"]["sample_records_by_task_type"]={}
  for rec in records:
   typ=str(rec.get("task_type","UNSPECIFIED"))
