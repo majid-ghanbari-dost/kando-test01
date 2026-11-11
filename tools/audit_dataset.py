@@ -40,7 +40,8 @@ def main():
   r["checks"]["jsonl_parse"]="PASS" if not bad else "FAIL"
   if bad:r["errors"].append("JSONL parse errors: "+json.dumps(bad[:10],ensure_ascii=False))
  schemas=[p for p in files if p.name.endswith(".schema.json") or (any(part.lower().startswith("schema") for part in p.parts) and p.suffix==".json") or "schema" in p.name.lower()]
- r["metrics"]["schema_candidates"]=[str(p.relative_to(root)) for p in schemas]\n if records and schemas:
+ r["metrics"]["schema_candidates"]=[str(p.relative_to(root)) for p in schemas]
+ if records and schemas:
   try:
    import jsonschema
    s=json.loads(schemas[0].read_text(encoding="utf-8"));cls=jsonschema.validators.validator_for(s);cls.check_schema(s);v=cls(s);fail=[]
@@ -95,7 +96,7 @@ def main():
   r["metrics"]["manifest"]={"checked":checked,"missing":missing,"mismatched":mismatch,"malformed":malformed};r["checks"]["sha256_manifest"]="PASS" if checked and not missing and not mismatch and not malformed else "FAIL"
   if missing or mismatch or malformed:r["errors"].append("SHA-256 manifest verification failed.")
  else:r["checks"]["sha256_manifest"]="NOT_FOUND";r["warnings"].append("SHA-256 manifest not found.")
- batches=sorted(p for p in files if re.fullmatch(r"batch_\\d+\\.jsonl",p.name,re.I))
+ batches=sorted(p for p in files if re.fullmatch(r"batch_\d+\.jsonl",p.name,re.I))
  if dataset and batches:
   exact=b"".join(p.read_bytes() for p in batches)==dataset.read_bytes();r["metrics"]["batch_file_count"]=len(batches);r["metrics"]["batch_paths"]=[str(p.relative_to(root)) for p in batches];r["checks"]["batch_reconstruction_byte_exact"]="PASS" if exact else "FAIL"
   if not exact:
