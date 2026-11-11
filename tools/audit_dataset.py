@@ -62,7 +62,7 @@ def main():
   except Exception as e:r["checks"]["json_schema"]="ERROR";r["warnings"].append("Schema validation error: "+repr(e))
  else:r["checks"]["json_schema"]="NOT_RUN";r["warnings"].append("No schema or parsed records.")
  if records:
-  ids=[];texts=collections.defaultdict(set);st=collections.defaultdict(set);intents=collections.Counter();splits=collections.Counter();reviews=collections.Counter();clarify=collections.Counter();multi=0
+  ids=[];texts=collections.defaultdict(set);st=collections.defaultdict(set);intents=collections.Counter();splits=collections.Counter();reviews=collections.Counter();clarify=collections.Counter();task_types=collections.Counter();multi=0;split_present=0;shape_errors=[];dependency_errors=[]
   def strings(o):
    if isinstance(o,dict):
     for k,v in o.items():
@@ -73,21 +73,50 @@ def main():
   for i,x in enumerate(records,1):
    rid=x.get("id",x.get("record_id"))
    if rid is not None:ids.append(str(rid))
-   sp=str(x.get("split",x.get("dataset_split","UNSPECIFIED"))).upper();splits[sp]+=1;reviews[str(x.get("review_status","MISSING"))]+=1;clarify[str(x.get("needs_clarification","MISSING"))]+=1
-   arr=x.get("intents")
-   if isinstance(arr,list):
-    ns=[y.get("intent") or y.get("name") for y in arr if isinstance(y,dict)];multi+=len(ns)>1;intents.update(y for y in ns if y)
-   elif x.get("intent"):intents[str(x["intent"])]+=1
+   raw_split=x.get("split",x.get("dataset_split"))
+   if raw_split is not None:split_present+=1
+   sp=str(raw_split if raw_split is not None else "UNSPECIFIED").upper()
+   splits[sp]+=1;reviews[str(x.get("review_status","MISSING"))]+=1;clarify[str(x.get("needs_clarification","MISSING"))]+=1
+   typ=str(x.get("task_type","MISSING"));task_types[typ]+=1
+   arr=x.get("intents") if isinstance(x.get("intents"),list) else []
+   cand=x.get("candidate_intents") if isinstance(x.get("candidate_intents"),list) else []
+   names=[y.get("intent") or y.get("name") for y in arr if isinstance(y,dict)]
+   intents.update(y for y in names if y);multi+=len(names)>1
+   issue=None
+   if typ=="single" and len(arr)!=1:issue="single_requires_exactly_one_intent"
+   elif typ=="multi" and len(arr)<2:issue="multi_requires_at_least_two_intents"
+   elif typ=="ambiguous" and (len(arr)!=0 or len(cand)<2):issue="ambiguous_requires_empty_intents_and_two_candidates"
+   elif typ=="out_of_scope" and (len(arr)!=0 or len(cand)!=0):issue="out_of_scope_must_not_have_intents_or_candidates"
+   if issue:shape_errors.append({"id":rid,"issue":issue})
+   edges={}
+   for j,slot in enumerate(arr):
+    if not isinstance(slot,dict):continue
+    dep=slot.get("depends_on")
+    if dep is not None:
+     if not isinstance(dep,int) or dep<0 or dep>=len(arr) or dep==j:dependency_errors.append({"id":rid,"slot":j,"depends_on":dep,"issue":"invalid_dependency_index"})
+     else:edges[j]=dep
+   for node in edges:
+    seen=set();cur=node
+    while cur in edges:
+     if cur in seen:dependency_errors.append({"id":rid,"slot":node,"issue":"dependency_cycle"});break
+     seen.add(cur);cur=edges[cur]
    for k,val in strings(x):
-    if k.lower() in {"text","utterance","message","query","user_input"} and norm(val):texts[norm(val)].add(i);st[norm(val)].add(sp)
+    if k.lower() in {"text","utterance","message","query","user_input"} and norm(val):
+     texts[norm(val)].add(i);st[norm(val)].add(sp)
   dupid=len(ids)-len(set(ids));leak=sum(len(v)>1 for v in st.values())
-  r["metrics"].update({"unique_ids":len(set(ids)),"duplicate_ids":dupid,"duplicate_normalized_utterances":sum(len(v)>1 for v in texts.values()),"cross_split_exact_utterance_leakage":leak,"split_counts":dict(splits),"intent_counts":dict(intents),"review_status_counts":dict(reviews),"clarification_counts":dict(clarify),"multi_intent_records":multi})
-  r["checks"]["record_ids_unique"]="PASS" if ids and not dupid else "FAIL";r["checks"]["cross_split_exact_text_leakage"]="PASS" if not leak else "FAIL"
+  r["metrics"].update({"unique_ids":len(set(ids)),"duplicate_ids":dupid,"duplicate_normalized_utterances":sum(len(v)>1 for v in texts.values()),"cross_split_exact_utterance_leakage":leak if split_present else "NOT_TESTABLE","split_labeled_record_count":split_present,"split_counts":dict(splits),"intent_slot_counts":dict(intents),"task_type_counts":dict(task_types),"review_status_counts":dict(reviews),"clarification_counts":dict(clarify),"multi_intent_records":multi,"task_type_consistency_errors":len(shape_errors),"task_type_consistency_samples":shape_errors[:10],"dependency_errors":len(dependency_errors),"dependency_error_samples":dependency_errors[:10]})
+  r["checks"]["record_ids_unique"]="PASS" if ids and not dupid else "FAIL"
+  r["checks"]["cross_split_exact_text_leakage"]=("PASS" if not leak else "FAIL") if split_present else "NOT_RUN"
+  r["checks"]["task_type_consistency"]="PASS" if not shape_errors else "FAIL"
+  r["checks"]["multi_intent_dependencies"]="PASS" if not dependency_errors else "FAIL"
   if dupid:r["errors"].append("Duplicate record IDs: "+str(dupid))
-  if leak:r["errors"].append("Cross-split exact utterance leakage: "+str(leak))
+  if split_present and leak:r["errors"].append("Cross-split exact utterance leakage: "+str(leak))
+  if not split_present:r["warnings"].append("No split assignment field found in dataset records; train/validation/test leakage cannot be assessed.")
+  if shape_errors:r["errors"].append("Task type consistency errors: "+str(len(shape_errors)))
+  if dependency_errors:r["errors"].append("Multi-intent dependency errors: "+str(len(dependency_errors)))
   if "seed_needs_review" in reviews:r["warnings"].append("Records marked seed_needs_review; automated checks are not human approval.")
   if len(records)!=398:r["warnings"].append("Record count differs from stated 398: "+str(len(records)))
- manifests=[p for p in files if p.name.lower() in {"manifest-sha256.txt","manifest.sha256","sha256sums.txt"}]
+  manifests=[p for p in files if p.name.lower() in {"manifest-sha256.txt","manifest.sha256","sha256sums.txt"}]
  if manifests:
   checked=0;missing=[];mismatch=[];malformed=[]
   for line in manifests[0].read_text(encoding="utf-8-sig").splitlines():
